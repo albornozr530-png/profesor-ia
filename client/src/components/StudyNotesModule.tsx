@@ -17,6 +17,7 @@ import { StudentProfile, StudyNote } from '../types';
 import { requestStudyNotes } from '../utils/api';
 import { getStoredNotes, saveStudyNote } from '../utils/storage';
 import { InteractiveFlashcards } from './InteractiveFlashcards';
+import { MarkdownText } from './MarkdownText';
 
 interface StudyNotesModuleProps {
   profile: StudentProfile;
@@ -260,7 +261,7 @@ ${currentNote.memoryTrick}
                   Resumen Conceptual:
                 </h4>
                 <p className="text-xs sm:text-sm text-slate-800 dark:text-slate-200 leading-relaxed font-medium">
-                  {currentNote.summary}
+                  <MarkdownText content={currentNote.summary} />
                 </p>
               </div>
 
@@ -291,7 +292,7 @@ ${currentNote.memoryTrick}
                   Ejemplo o Caso Práctico en la Realidad:
                 </h4>
                 <p className="text-xs sm:text-sm text-slate-800 dark:text-slate-200 leading-relaxed">
-                  {currentNote.practicalExample}
+                  <MarkdownText content={currentNote.practicalExample} />
                 </p>
               </div>
 
@@ -390,7 +391,7 @@ ${currentNote.memoryTrick}
                       {note.title}
                     </h5>
                     <p className="text-[11px] text-slate-500 line-clamp-2 leading-snug">
-                      {note.summary}
+                      <MarkdownText content={note.summary} />
                     </p>
                   </div>
                 ))}

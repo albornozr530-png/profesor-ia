@@ -24,6 +24,7 @@ import {
 import { StudentProfile, Flashcard, FlashcardDeck, MasteryRating } from '../types';
 import { requestFlashcards } from '../utils/api';
 import { getStoredFlashcardDecks, saveFlashcardDeck, deleteFlashcardDeck } from '../utils/storage';
+import { MarkdownText } from './MarkdownText';
 
 interface InteractiveFlashcardsProps {
   profile: StudentProfile;
@@ -546,7 +547,7 @@ export const InteractiveFlashcards: React.FC<InteractiveFlashcardsProps> = ({
                     Respuesta del Profesor IA:
                   </span>
                   <p className="text-base sm:text-lg font-medium text-slate-100 leading-relaxed">
-                    {currentCard.back}
+                    <MarkdownText content={currentCard.back} />
                   </p>
                 </div>
 

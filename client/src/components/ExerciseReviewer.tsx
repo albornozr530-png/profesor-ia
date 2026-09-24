@@ -19,6 +19,7 @@ import { StudentProfile, ExerciseReviewResult } from '../types';
 import { requestExerciseReview } from '../utils/api';
 import { getStoredReviews, saveReviewResult } from '../utils/storage';
 import { isDictationAvailable, startDictation, DictationController } from '../utils/speech';
+import { MarkdownText } from './MarkdownText';
 
 interface ExerciseReviewerProps {
   profile: StudentProfile;
@@ -524,7 +525,7 @@ export const ExerciseReviewer: React.FC<ExerciseReviewerProps> = ({
                 </span>
               </div>
               <h3 className="text-base sm:text-lg font-bold">
-                {currentResult.summary}
+                <MarkdownText content={currentResult.summary} />
               </h3>
             </div>
           </div>
@@ -573,8 +574,8 @@ export const ExerciseReviewer: React.FC<ExerciseReviewerProps> = ({
               <BookOpen className="w-4 h-4 text-indigo-600" />
               Explicación del Profesor (Cómo razonarlo paso a paso):
             </h4>
-            <div className="text-xs sm:text-sm text-slate-800 dark:text-slate-200 whitespace-pre-wrap leading-relaxed">
-              {currentResult.pedagogicalExplanation}
+            <div className="text-xs sm:text-sm text-slate-800 dark:text-slate-200 leading-relaxed">
+              <MarkdownText content={currentResult.pedagogicalExplanation} />
             </div>
           </div>
 

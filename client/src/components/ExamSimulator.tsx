@@ -15,6 +15,7 @@ import {
 import { StudentProfile, QuizQuestion, QuizResult } from '../types';
 import { requestQuiz } from '../utils/api';
 import { saveQuizResult } from '../utils/storage';
+import { MarkdownText } from './MarkdownText';
 
 interface ExamSimulatorProps {
   profile: StudentProfile;
@@ -271,7 +272,7 @@ export const ExamSimulator: React.FC<ExamSimulatorProps> = ({ profile }) => {
           {/* Question Text */}
           <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700/80">
             <h4 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white leading-relaxed">
-              {currentQ.question}
+              <MarkdownText content={currentQ.question} />
             </h4>
           </div>
 
@@ -327,7 +328,7 @@ export const ExamSimulator: React.FC<ExamSimulatorProps> = ({ profile }) => {
                 <span>Explicación del Profesor:</span>
               </div>
               <p className="text-xs sm:text-sm text-slate-800 dark:text-slate-200 leading-relaxed">
-                {currentQ.explanation}
+                <MarkdownText content={currentQ.explanation} />
               </p>
               {currentQ.tip && (
                 <div className="text-xs font-medium text-indigo-700 dark:text-indigo-300 italic pt-1">

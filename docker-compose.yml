@@ -1,0 +1,21 @@
+services:
+  profesor-ia:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: profesor-ia
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      HOST: 0.0.0.0
+      PORT: 3001
+      PROFESOR_IA_DATA_DIR: /app/data
+    # Nginx/proxy reverse del servidor escucha en este puerto.
+    ports:
+      - "127.0.0.1:3001:3001"
+    volumes:
+      - profesor_data:/app/data
+
+volumes:
+  profesor_data:

@@ -1,0 +1,14 @@
+node_modules/
+server/data/
+dist/
+*.log
+.DS_Store
+.env
+.env.*
+!.env.example
+release/
+android/.gradle/
+android/build/
+android/app/build/
+android/capacitor-cordova-android-plugins/build/
+profesor-ia---tutor-de-estudios-adaptativo-ORIGINAL/

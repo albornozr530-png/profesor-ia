@@ -1,0 +1,10 @@
+node_modules/
+**/node_modules/
+client/dist/
+server/data/
+release/
+android/
+.git/
+.env
+*.log
+profesor-ia---tutor-de-estudios-adaptativo-ORIGINAL/

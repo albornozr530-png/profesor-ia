@@ -1,0 +1,21 @@
+[Unit]
+Description=Profesor IA web
+After=network.target
+
+[Service]
+Type=simple
+User=profesor-ia
+Group=profesor-ia
+WorkingDirectory=/opt/profesor-ia
+EnvironmentFile=/opt/profesor-ia/.env
+Environment=HOST=127.0.0.1
+Environment=PORT=3001
+Environment=PROFESOR_IA_DATA_DIR=/var/lib/profesor-ia
+ExecStart=/usr/bin/node server/src/index.js
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

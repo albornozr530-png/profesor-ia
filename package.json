@@ -1,0 +1,76 @@
+{
+  "name": "profesor-ia",
+  "version": "1.0.0",
+  "private": true,
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "description": "Profesor IA - Asistente de estudios universal para web, Windows y Android",
+  "author": "Profesor IA",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "install:all": "npm --prefix server install && npm --prefix client install",
+    "dev": "concurrently -n SERVER,CLIENT -c cyan,magenta \"npm --prefix server run dev\" \"npm --prefix client run dev\"",
+    "build": "npm --prefix client run build",
+    "build:web": "npm --prefix client run build",
+    "start": "npm --prefix server run start",
+    "preview": "npm --prefix client run preview",
+    "typecheck": "npm --prefix client run typecheck",
+    "electron:dev": "concurrently -n VITE,ELECTRON -c magenta,cyan \"npm --prefix client run dev -- --host 127.0.0.1\" \"electron electron/main.cjs\"",
+    "build:win": "npm run build:web && electron-builder --win nsis portable",
+    "android:sync": "npm run build:web && cap sync android",
+    "android:open": "cap open android",
+    "android:build": "npm run android:sync && cap build android"
+  },
+  "dependencies": {
+    "@capacitor-community/speech-recognition": "^7.0.1",
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/core": "^8.5.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.5.2",
+    "concurrently": "^9.1.0",
+    "electron": "^44.4.5",
+    "electron-builder": "^26.15.3",
+    "typescript": "^5.6.3"
+  },
+  "build": {
+    "appId": "com.profesor.ia",
+    "productName": "Profesor IA",
+    "asar": true,
+    "icon": "client/public/icon-512.png",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "electron/**/*",
+      "client/dist/**/*",
+      "server/src/**/*",
+      "server/package.json",
+      "server/node_modules/**/*"
+    ],
+    "extraMetadata": {
+      "main": "electron/main.cjs"
+    },
+    "win": {
+      "target": [
+        { "target": "nsis", "arch": ["x64"] },
+        { "target": "portable", "arch": ["x64"] }
+      ],
+      "artifactName": "Profesor-IA-${version}-${arch}.${ext}",
+      "icon": "client/public/icon-512.png",
+      "signExecutable": false
+    },
+    "nsis": {
+      "artifactName": "Profesor-IA-Setup-${version}-${arch}.${ext}",
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Profesor IA"
+    },
+    "portable": {
+      "artifactName": "Profesor-IA-Portable-${version}-${arch}.${ext}"
+    }
+  }
+}

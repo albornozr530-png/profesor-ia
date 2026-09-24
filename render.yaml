@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: profesor-ia
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: CLIENT_ORIGINS
+        sync: false
+      - key: POLLINATIONS_API_KEY
+        sync: false
+      - key: TRANSCRIPTION_API_KEY
+        sync: false
+      - key: VITE_API_BASE_URL
+        value: ''

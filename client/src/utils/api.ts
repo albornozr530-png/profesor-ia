@@ -79,6 +79,7 @@ export async function streamChatMessage(
   let full = '';
   let sources: ChatResponse['sources'] = [];
   let streamError: string | null = null;
+  let finalText: string | null = null;
 
   const processEvent = (event: string, data: string) => {
     let parsed: any;
@@ -93,6 +94,9 @@ export async function streamChatMessage(
     } else if (event === 'delta') {
       full += parsed.text || '';
       onDelta?.(parsed.text || '');
+    } else if (event === 'final') {
+      // Versión limpia final (sin símbolos de Markdown) enviada por el servidor.
+      if (typeof parsed.text === 'string' && parsed.text) finalText = parsed.text;
     } else if (event === 'error') {
       streamError = parsed.error || 'Error del motor de IA';
     }
@@ -118,7 +122,7 @@ export async function streamChatMessage(
 
   if (streamError && !full) throw new Error(streamError);
   if (!full && !streamError) throw new Error('La respuesta del profesor llegó vacía. Intenta de nuevo.');
-  return { text: full, sources };
+  return { text: finalText || full, sources };
 }
 
 export async function requestExerciseReview(

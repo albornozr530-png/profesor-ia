@@ -223,3 +223,176 @@ export const SAMPLE_PROMPTS_BY_LEVEL: Record<AcademicLevel, string[]> = {
     '🤖 ¿Cómo funciona una red neuronal de manera intuitiva y sin matemáticas pesadas?',
   ],
 };
+
+// ---------- Sugerencias inteligentes por perfil ----------
+// Primaria y secundaria: datos curiosos que invitan a preguntar.
+// Universidad y posgrado: tips del área de estudio del estudiante.
+
+const FUN_FACTS_PRIMARIA: string[] = [
+  '¿Sabías que los pulpos tienen 3 corazones y sangre azul?',
+  '¿Sabías que un rayo puede calentar el aire 5 veces más que el sol?',
+  '¿Sabías que las abejas reconocen rostros y bailan para hablar?',
+  '¿Sabías que la Luna se aleja de la Tierra 4 centímetros cada año?',
+  '¿Sabías que tu cuerpo tiene más de 200 huesos cuando eres bebé?',
+  '¿Sabías que los árboles se comunican entre ellos por las raíces?',
+  '¿Sabías que un delfín duerme con medio cerebro despierto?',
+  '¿Sabías que el azúcar moreno y el blanco vienen de la misma planta?',
+];
+
+const FUN_FACTS_SECUNDARIA: string[] = [
+  '¿Sabías que el agua que bebes hoy pudo ser de un dinosaurio?',
+  '¿Sabías que la luz del Sol tarda 8 minutos en llegar a la Tierra?',
+  '¿Sabías que tu cuerpo tiene suficiente hierro para hacer un clavo?',
+  '¿Sabías que Venus gira al revés y un día dura más que un año?',
+  '¿Sabías que los tiburones existían antes que los árboles?',
+  '¿Sabías que el vidrio es un líquido tan viscoso que parece sólido?',
+  '¿Sabías que sin la Luna la Tierra giraría tan rápido que un día duraría 6 horas?',
+  '¿Sabías que hay más células de bacterias en tu cuerpo que células tuyas?',
+];
+
+interface CareerTipGroup {
+  match: RegExp;
+  tips: string[];
+}
+
+const CAREER_TIPS: CareerTipGroup[] = [
+  {
+    match: /medic|enfermer|bioanáli|odontolog|veterinar|farmac|salud|medicina|anatom|fisiolog/,
+    tips: [
+      'Tip de Medicina: repasa la cascada de coagulación con un caso clínico',
+      'Tip de Medicina: ¿cómo actúa la penicilina sobre la pared bacteriana?',
+      'Tip de Medicina: interprétame un ECG básico paso a paso',
+      'Tip de Medicina: diferencia entre hipertrofia e hiperplasia con ejemplos',
+      'Tip de Medicina: vías de administración de fármacos y sus ventajas',
+      'Tip de Medicina: repasa los signos vitales y sus valores normales',
+    ],
+  },
+  {
+    match: /ingenier|sistema|software|comput|informát|tecnolog|program|redes|datos/,
+    tips: [
+      'Tip de Ingeniería: diferencia entre proceso e hilo con un ejemplo real',
+      'Tip de Ingeniería: ¿cuándo conviene SQL y cuándo NoSQL?',
+      'Tip de Ingeniería: explícame la notación Big-O con ejemplos',
+      'Tip de Ingeniería: cómo funciona el protocolo TCP/IP paso a paso',
+      'Tip de Ingeniería: patrones de diseño más usados en la industria',
+      'Tip de Ingeniería: ¿qué es una API REST y cómo se consume?',
+    ],
+  },
+  {
+    match: /derecho|jurídic|abogac|legal|penal|constitucional/,
+    tips: [
+      'Tip de Derecho: diferencia entre dolo eventual y culpa con casos',
+      'Tip de Derecho: elementos del delito explicados con un ejemplo',
+      'Tip de Derecho: jerarquía de las fuentes del derecho',
+      'Tip de Derecho: requisitos de validez de un contrato',
+      'Tip de Derecho: diferencia entre prescripción y caducidad',
+      'Tip de Derecho: cómo se interpreta una norma constitucional',
+    ],
+  },
+  {
+    match: /psicolog|conduct|clínica psico/,
+    tips: [
+      'Tip de Psicología: diferencia entre refuerzo positivo y negativo',
+      'Tip de Psicología: etapas del desarrollo cognitivo de Piaget',
+      'Tip de Psicología: ¿cómo funciona la memoria a corto y largo plazo?',
+      'Tip de Psicología: sesgos cognitivos más comunes con ejemplos',
+      'Tip de Psicología: criterios básicos para diagnosticar depresión',
+      'Tip de Psicología: teorías de la personalidad comparadas',
+    ],
+  },
+  {
+    match: /admin|contadur|econom|finanz|negocio|comercio|gerenc|market|emprend/,
+    tips: [
+      'Tip de Negocios: cómo calcular e interpretar el punto de equilibrio',
+      'Tip de Negocios: diferencia entre costo fijo, variable y marginal',
+      'Tip de Negocios: ¿qué es el WACC y por qué importa en finanzas?',
+      'Tip de Negocios: las 4P del marketing con ejemplos reales',
+      'Tip de Negocios: cómo leer un estado de resultados paso a paso',
+      'Tip de Negocios: análisis FODA aplicado a una empresa real',
+    ],
+  },
+  {
+    match: /educaci|pedagog|docen/,
+    tips: [
+      'Tip de Educación: cómo diseñar una clase con objetivos SMART',
+      'Tip de Educación: técnicas de evaluación formativa vs sumativa',
+      'Tip de Educación: la taxonomía de Bloom aplicada a planificar',
+      'Tip de Educación: estrategias para manejar aulas diversas',
+    ],
+  },
+  {
+    match: /arquitect|urbanis|civil|estructur/,
+    tips: [
+      'Tip de Arquitectura: tipos de estructuras y cómo resisten cargas',
+      'Tip de Arquitectura: principios del diseño bioclimático',
+      'Tip de Arquitectura: cómo leer planos arquitectónicos paso a paso',
+      'Tip de Arquitectura: diferencia entre cemento, hormigón y concreto',
+    ],
+  },
+  {
+    match: /agronom|agro|veterinaria|ambient|biolog|química|geolog/,
+    tips: [
+      'Tip de Ciencias: ciclo del nitrógeno y su papel en la agricultura',
+      'Tip de Ciencias: cómo funciona el efecto invernadero realmente',
+      'Tip de Ciencias: cadenas tróficas con un ejemplo de ecosistema',
+      'Tip de Ciencias: por qué los suelos se degradan y cómo se recuperan',
+    ],
+  },
+  {
+    match: /comunicac|periodis|publicidad|audiovisual|letras|historia|humanidades|filosof|arte/,
+    tips: [
+      'Tip de Humanidades: cómo estructurar un ensayo argumentativo',
+      'Tip de Humanidades: diferencia entre análisis y síntesis',
+      'Tip de Humanidades: falacias lógicas más comunes con ejemplos',
+      'Tip de Humanidades: técnicas de retórica clásica para persuadir',
+    ],
+  },
+];
+
+const DEFAULT_UNI_TIPS: string[] = [
+  'Tip de estudio: cómo hacer un mapa mental que de verdad funcione',
+  'Tip de estudio: técnica Pomodoro para sesiones de concentración',
+  'Tip de estudio: cómo preparar un examen con repaso espaciado',
+  'Tip de estudio: método Feynman para entender cualquier tema a fondo',
+];
+
+const POSGRADO_TIPS: string[] = [
+  'Tip de investigación: cómo formular una pregunta de investigación sólida',
+  'Tip de investigación: validez y confiabilidad en diseño metodológico',
+  'Tip de investigación: cómo hacer una revisión de literatura sistemática',
+  'Tip de investigación: estructura IMRaD para escribir un paper',
+];
+
+function pickRandom(items: string[], count: number): string[] {
+  const copy = [...items];
+  const picked: string[] = [];
+  while (picked.length < count && copy.length) {
+    const idx = Math.floor(Math.random() * copy.length);
+    picked.push(copy.splice(idx, 1)[0]);
+  }
+  return picked;
+}
+
+export function getSuggestedPrompts(profile: {
+  level: AcademicLevel;
+  career?: string;
+  subject?: string;
+}): string[] {
+  if (profile.level === 'primaria') return pickRandom(FUN_FACTS_PRIMARIA, 4);
+  if (profile.level === 'secundaria') return pickRandom(FUN_FACTS_SECUNDARIA, 4);
+
+  const areaText = `${profile.career || ''} ${profile.subject || ''}`.toLowerCase();
+  const matched = CAREER_TIPS.find((g) => g.match.test(areaText));
+
+  if (profile.level === 'posgrado') {
+    const careerPicked = matched ? pickRandom(matched.tips, 2) : [];
+    return [...careerPicked, ...pickRandom(POSGRADO_TIPS, careerPicked.length ? 2 : 4)];
+  }
+
+  if (profile.level === 'universidad') {
+    return matched ? pickRandom(matched.tips, 4) : DEFAULT_UNI_TIPS;
+  }
+
+  // Autodidacta: mantener las sugerencias originales del nivel.
+  return SAMPLE_PROMPTS_BY_LEVEL.autodidacta;
+}

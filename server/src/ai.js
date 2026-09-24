@@ -46,6 +46,46 @@ function joinText(head, tail) {
   return head.replace(/\s+$/, '') + tail.replace(/^\s+/, ' ')
 }
 
+// Convierte Markdown a texto natural fluido. Los modelos están entrenados con
+// Markdown y a menudo lo usan aunque se les pida lo contrario; esta limpieza
+// determinista garantiza que el estudiante nunca vea **asteriscos** ni ## barras.
+export function markdownToPlain(text) {
+  if (!text) return text
+  let t = text
+  // Bloques de código: se conservan (son contenido real), sin las cercas ```
+  t = t.replace(/```[a-zA-Z0-9]*\n([\s\S]*?)```/g, (_m, code) => `\n${code.trim()}\n`)
+  // Negritas y cursivas: **texto**, __texto__, *texto*, _texto_ -> texto
+  t = t.replace(/\*\*([^*]+)\*\*/g, '$1')
+  t = t.replace(/__([^_]+)__/g, '$1')
+  t = t.replace(/(^|[\s(])\*([^*\n]+)\*(?=[\s).,!?:;]|$)/g, '$1$2')
+  t = t.replace(/(^|[\s(])_([^_\n]+)_(?=[\s).,!?:;]|$)/g, '$1$2')
+  // Tachado ~~texto~~ -> texto
+  t = t.replace(/~~([^~]+)~~/g, '$1')
+  // Títulos: "## Título" -> "Título" (el texto ya estructura por sí mismo)
+  t = t.replace(/^#{1,6}\s*(.+)$/gm, '$1')
+  // Separadores --- / *** / ___ -> punto y aparte limpio
+  t = t.replace(/^\s*([-*_]\s*){3,}$/gm, '')
+  // Imágenes ![alt](url) -> (imagen omitida: url)
+  t = t.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '($2)')
+  // Enlaces [texto](url) -> texto (url)
+  t = t.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '$1 ($2)')
+  // Citas "> texto" -> texto
+  t = t.replace(/^>\s*(.*)$/gm, '$1')
+  // Tablas: | a | b | -> "a — b" por fila, ignorando separadores
+  t = t.replace(/^\s*\|?[-: ]+\|[-:| ]+\|?\s*$/gm, '')
+  t = t.replace(/^\s*\|(.+)\|\s*$/gm, (_m, row) => '\n' + row.split('|').map((c) => c.trim()).filter(Boolean).join(' — '))
+  // Barras residuales en prosa (tablas malformadas del modelo): se limpian.
+  t = t.replace(/\s*\|\s*/g, ' — ')
+  // Listas: "- item" / "* item" / "1. item" -> guión simple o número limpio
+  t = t.replace(/^\s*[-*•]\s+/gm, '• ')
+  t = t.replace(/^\s*(\d+)[.)]\s+/gm, '$1. ')
+  // Código en línea `x` -> x
+  t = t.replace(/`([^`]+)`/g, '$1')
+  // Colapsar saltos de línea triples o más
+  t = t.replace(/\n{3,}/g, '\n\n')
+  return t.trim()
+}
+
 export async function callPollinations(messages, { json = false } = {}) {
   const body = {
     model: MODEL,
@@ -169,7 +209,7 @@ export async function callPollinationsComplete(messages, { json = false } = {}) 
     full = joinText(full, more)
     calls++
   }
-  return full
+  return markdownToPlain(full)
 }
 
 // streamPollinations con continuación automática: el estudiante ve la
@@ -214,10 +254,11 @@ ${semester}
 ${modePrompt}
 Reglas generales:
 - Responde SIEMPRE en español, en el idioma/tono adecuado al nivel del estudiante.
-- Usa formato Markdown: títulos, listas, **negritas**, fórmulas, tablas cuando ayuden.
+- ESCRITURA NATURAL Y FLUIDA: escribe en prosa limpia y continua, como un profesor hablando a su estudiante. NO uses símbolos de formato: nada de **asteriscos**, ## numerales, ### barras de título, --- separadores, ni tablas con barras |. El texto se muestra tal cual al estudiante: los símbolos se verían como basura visual. Puedes usar párrafos, guiones simples para listas si de verdad ayudan, y emojis con moderación.
+- Estructura la profundidad con PALABRAS, no con símbolos: usa frases como "En primer lugar...", "Veamos esto paso a paso", "Un punto importante es...", "Para terminar...", "Un error común es...". La claridad sale del lenguaje, no del formato.
 - Sé pedagógico: explica paso a paso, verifica la comprensión, pregunta si algo no quedó claro.
 - PROFUNDIDAD OBLIGATORIA: nunca des una explicación superficial. Desarrolla el tema completo: contexto y definiciones precisas, fundamentos teóricos, ejemplos resueltos paso a paso, errores o confusiones comunes, y una síntesis final. Si el tema lo amerita, estructura la respuesta con secciones.
-- No cortes la respuesta por brevedad ni la resumas en exceso: explica hasta que el tema quede verdaderamente comprendido. Extiende la respuesta tanto como sea pedagógicamente útil.
+- RESPUESTAS EXTENSAS: no cortes la respuesta por brevedad ni la resumas en exceso. Una buena explicación de tema completo lleva varios párrafos desarrollados. Extiende la respuesta tanto como sea pedagógicamente útil: el objetivo es que el estudiante quede con comprensión real, no con un resumen apresurado.
 - Si el estudiante pide verificar un ejercicio, revisa con lupa cada paso y señala errores exactos.
 - Si no sabes algo con certeza, dilo y sugiere cómo averiguarlo.${searchBlock}`
 }

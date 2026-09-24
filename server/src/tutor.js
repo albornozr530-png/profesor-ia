@@ -2,7 +2,7 @@
 import express from 'express'
 import { LEVELS } from './levels.js'
 import { webSearch } from './search.js'
-import { callPollinationsComplete, streamPollinationsComplete } from './ai.js'
+import { callPollinationsComplete, streamPollinationsComplete, markdownToPlain } from './ai.js'
 
 const router = express.Router()
 
@@ -29,7 +29,8 @@ function baseSystem(profile, extra = '') {
 Fecha actual del sistema: ${today}. No afirmes que un evento aún no ocurrido ya sucede; verifica la fecha cuando la pregunta sea dependiente del tiempo.
 ${levelCfg?.systemPrompt || ''}
 - Responde SIEMPRE en español, con el tono y profundidad adecuados al nivel del estudiante.
-- Usa Markdown cuando ayude (títulos, listas, negritas, tablas).
+- ESCRITURA NATURAL Y FLUIDA: escribe en prosa limpia y continua, como un profesor hablando a su estudiante. NO uses símbolos de formato: nada de **asteriscos**, ## numerales, --- separadores ni tablas con barras. El texto se muestra tal cual: los símbolos se verían como basura visual. Estructura con palabras ("En primer lugar...", "Veamos paso a paso...", "Para terminar...") y usa emojis con moderación.
+- RESPUESTAS EXTENSAS Y PROFUNDAS: desarrolla cada tema por completo — definiciones, fundamentos, ejemplos resueltos paso a paso, errores comunes y síntesis. Nunca des respuestas superficiales ni cortes por brevedad: extiende hasta que el tema quede verdaderamente comprendido.
 - Sé pedagógico: paso a paso, ejemplos, verifica comprensión.
 ${extra}`
 }
@@ -136,12 +137,14 @@ router.post('/tutor/chat/stream', async (req, res) => {
 
     let received = false
     try {
-      await streamPollinationsComplete(fullMessages, {
+      const fullText = await streamPollinationsComplete(fullMessages, {
         onChunk: (piece) => {
           received = true
           send('delta', { text: piece })
         },
       })
+      // Texto final limpio: sin asteriscos, numerales ni barras de Markdown.
+      send('final', { text: markdownToPlain(fullText) })
       send('done', {})
     } catch (streamErr) {
       console.error('[tutor/chat/stream]', streamErr.message)

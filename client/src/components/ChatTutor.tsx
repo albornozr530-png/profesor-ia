@@ -22,7 +22,7 @@ import { sendChatMessage, streamChatMessage } from '../utils/api';
 import { MarkdownText } from './MarkdownText';
 import { getStoredChat, saveStoredChat } from '../utils/storage';
 import { isDictationAvailable, startDictation, DictationController } from '../utils/speech';
-import { SAMPLE_PROMPTS_BY_LEVEL, ACADEMIC_LEVELS } from '../utils/academicPresets';
+import { ACADEMIC_LEVELS, getSuggestedPrompts } from '../utils/academicPresets';
 
 interface ChatTutorProps {
   profile: StudentProfile;
@@ -52,7 +52,9 @@ export const ChatTutor: React.FC<ChatTutorProps> = ({ profile, onSendToReview })
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const levelInfo = ACADEMIC_LEVELS.find((l) => l.id === profile.level) || ACADEMIC_LEVELS[1];
-  const samplePrompts = SAMPLE_PROMPTS_BY_LEVEL[profile.level] || SAMPLE_PROMPTS_BY_LEVEL.secundaria;
+  // Sugerencias inteligentes: tips del área (universitario/posgrado) o datos
+  // curiosos (primaria/secundaria). Se regeneran al cambiar de perfil.
+  const [samplePrompts, setSamplePrompts] = useState<string[]>(() => getSuggestedPrompts(profile));
   // Cambiar de edad/nivel crea un contexto de conversación nuevo para no
   // reutilizar respuestas adaptadas a otro perfil.
   const chatContext = `${profile.subject || 'General'}::${profile.level}::${profile.age}`;
@@ -123,6 +125,7 @@ export const ChatTutor: React.FC<ChatTutorProps> = ({ profile, onSendToReview })
   // Load chat on profile / subject / age change
   useEffect(() => {
     const requestId = ++requestIdRef.current;
+    setSamplePrompts(getSuggestedPrompts(profile));
     setIsLoading(false);
     setInputText('');
     void dictationRef.current?.dispose();
@@ -552,7 +555,7 @@ export const ChatTutor: React.FC<ChatTutorProps> = ({ profile, onSendToReview })
               key={i}
               type="button"
               disabled={isLoading}
-              onClick={() => handleSendMessage(prompt.replace(/^[^\w\s]+/, '').trim())}
+              onClick={() => handleSendMessage(prompt)}
               className="shrink-0 px-2.5 py-1 rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-indigo-400 dark:hover:border-indigo-600 text-slate-700 dark:text-slate-300 text-[11px] transition shadow-xs hover:bg-slate-50 dark:hover:bg-slate-800"
             >
               {prompt}

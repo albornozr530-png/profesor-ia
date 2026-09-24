@@ -11,16 +11,48 @@ const POLLI_TEXT = POLLI_BASE.endsWith('/openai') || POLLI_BASE.endsWith('/chat/
   ? POLLI_BASE
   : `${POLLI_BASE}/chat/completions`
 const POLLI_IMAGE = process.env.POLLINATIONS_IMAGE_URL || 'https://image.pollinations.ai/prompt/'
-const MODEL = process.env.POLLINATIONS_MODEL || (hasKey ? 'openai/gpt-5.4-nano' : 'openai')
+// Modelo con mayor capacidad de razonamiento y respuestas profundas. El
+// "nano" anterior cortaba y daba explicaciones superficiales.
+const MODEL = process.env.POLLINATIONS_MODEL || (hasKey ? 'openai/gpt-5.4-mini' : 'openai')
 const REQUEST_TIMEOUT_MS = Number(process.env.AI_TIMEOUT_MS) || 90_000
+
+// Sin límite artificial de tokens: el profesor explica con la profundidad
+// que el tema requiera. Solo se envía max_tokens si se configura a propósito.
+const MAX_TOKENS = process.env.AI_MAX_TOKENS ? Number(process.env.AI_MAX_TOKENS) : null
+
+// El gateway gratuito de Pollinations corta las respuestas alrededor de
+// ~3100 caracteres (finish_reason: "length") sin importar max_tokens. Para
+// garantizar explicaciones completas y profundas, cuando se detecta un corte
+// se pide automáticamente una continuación que empiece exactamente donde
+// quedó el texto, y se une todo en una sola respuesta.
+const CONTINUATION_MAX_CALLS = Number(process.env.AI_CONTINUATION_MAX_CALLS) || 3
+
+function looksTruncated(text) {
+  if (!text) return false
+  const t = text.trim()
+  // Terminación "limpia": fin de frase, lista, tabla, bloque de código o cierre.
+  return !/([.!?…»"]|\*\*|```|\)|\])\s*$/.test(t)
+}
+
+function buildContinuationMessages(messages, partialText) {
+  const continuationPrompt = `Tu respuesta anterior quedó cortada a mitad de frase. Continúa EXACTAMENTE donde te quedaste, sin repetir nada de lo ya escrito, sin saludos ni introducciones, sin volver a explicar lo anterior. Retoma la frase incompleta y completa la explicación hasta terminarla por completo.`
+  const assistantMsg = { role: 'assistant', content: partialText }
+  return [...messages, assistantMsg, { role: 'user', content: continuationPrompt }]
+}
+
+function joinText(head, tail) {
+  // Une el fragmento previo con la continuación evitando duplicar espacios
+  // o saltos de línea en la costura.
+  return head.replace(/\s+$/, '') + tail.replace(/^\s+/, ' ')
+}
 
 export async function callPollinations(messages, { json = false } = {}) {
   const body = {
     model: MODEL,
     messages,
     temperature: 0.7,
-    max_tokens: 2048,
   }
+  if (MAX_TOKENS) body.max_tokens = MAX_TOKENS
   if (json) body.response_format = { type: 'json_object' }
 
   const headers = { 'Content-Type': 'application/json' }
@@ -56,6 +88,105 @@ export async function callPollinations(messages, { json = false } = {}) {
   }
 }
 
+// Igual que callPollinations pero transmite la respuesta en vivo (SSE del
+// proveedor -> callback por fragmento). Devuelve el texto completo.
+export async function streamPollinations(messages, { onChunk } = {}) {
+  const body = {
+    model: MODEL,
+    messages,
+    temperature: 0.7,
+    stream: true,
+  }
+  if (MAX_TOKENS) body.max_tokens = MAX_TOKENS
+
+  const headers = { 'Content-Type': 'application/json' }
+  if (process.env.POLLINATIONS_API_KEY) {
+    headers.Authorization = `Bearer ${process.env.POLLINATIONS_API_KEY}`
+  }
+
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+  try {
+    const res = await fetch(POLLI_TEXT, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    })
+    if (!res.ok) {
+      const text = await res.text().catch(() => '')
+      throw new Error(`Pollinations ${res.status}: ${text.slice(0, 200)}`)
+    }
+    if (!res.body) throw new Error('El proveedor no devolvió stream')
+
+    const reader = res.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    let full = ''
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+      buffer = lines.pop() || ''
+      for (const line of lines) {
+        const trimmed = line.trim()
+        if (!trimmed.startsWith('data:')) continue
+        const payload = trimmed.slice(5).trim()
+        if (!payload || payload === '[DONE]') continue
+        try {
+          const json = JSON.parse(payload)
+          const delta = json?.choices?.[0]?.delta
+          const piece = typeof delta?.content === 'string' ? delta.content : ''
+          if (piece) {
+            full += piece
+            onChunk?.(piece)
+          }
+        } catch {
+          // fragmento SSE incompleto: se ignora y se reintenta con el siguiente
+        }
+      }
+    }
+    if (!full.trim()) throw new Error('Respuesta vacía de Pollinations')
+    return full
+  } catch (error) {
+    if (error?.name === 'AbortError') throw new Error('El motor de IA tardó demasiado en responder.')
+    throw error
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+// callPollinations con continuación automática: si el proveedor corta la
+// respuesta (límite del gateway gratuito), se pide continuar y se une todo.
+export async function callPollinationsComplete(messages, { json = false } = {}) {
+  if (json) return callPollinations(messages, { json })
+  let full = await callPollinations(messages)
+  let calls = 1
+  while (looksTruncated(full) && calls < CONTINUATION_MAX_CALLS) {
+    const more = await callPollinations(buildContinuationMessages(messages, full))
+    if (!more.trim()) break
+    full = joinText(full, more)
+    calls++
+  }
+  return full
+}
+
+// streamPollinations con continuación automática: el estudiante ve la
+// escritura en vivo y, si el proveedor corta, la respuesta sigue fluyendo
+// sin que note la costura.
+export async function streamPollinationsComplete(messages, { onChunk } = {}) {
+  let full = await streamPollinations(messages, { onChunk })
+  let calls = 1
+  while (looksTruncated(full) && calls < CONTINUATION_MAX_CALLS) {
+    const more = await streamPollinations(buildContinuationMessages(messages, full), { onChunk })
+    if (!more.trim()) break
+    full = joinText(full, more)
+    calls++
+  }
+  return full
+}
+
 // Genera una imagen didáctica (diagramas, ilustraciones) sin API key en el
 // gateway legacy; una instalación productive puede sustituir la URL por su
 // proveedor de imágenes.
@@ -85,6 +216,8 @@ Reglas generales:
 - Responde SIEMPRE en español, en el idioma/tono adecuado al nivel del estudiante.
 - Usa formato Markdown: títulos, listas, **negritas**, fórmulas, tablas cuando ayuden.
 - Sé pedagógico: explica paso a paso, verifica la comprensión, pregunta si algo no quedó claro.
+- PROFUNDIDAD OBLIGATORIA: nunca des una explicación superficial. Desarrolla el tema completo: contexto y definiciones precisas, fundamentos teóricos, ejemplos resueltos paso a paso, errores o confusiones comunes, y una síntesis final. Si el tema lo amerita, estructura la respuesta con secciones.
+- No cortes la respuesta por brevedad ni la resumas en exceso: explica hasta que el tema quede verdaderamente comprendido. Extiende la respuesta tanto como sea pedagógicamente útil.
 - Si el estudiante pide verificar un ejercicio, revisa con lupa cada paso y señala errores exactos.
 - Si no sabes algo con certeza, dilo y sugiere cómo averiguarlo.${searchBlock}`
 }
@@ -107,8 +240,9 @@ export async function chat({ profile, mode, messages, useWeb }) {
   }
 
   const system = buildSystemPrompt(profile, mode, searchResults)
-  const fullMessages = [{ role: 'system', content: system }, ...messages.slice(-16)]
+  // Historial ampliado: 40 mensajes para no perder contexto en clases largas.
+  const fullMessages = [{ role: 'system', content: system }, ...messages.slice(-40)]
 
-  const content = await callPollinations(fullMessages)
+  const content = await callPollinationsComplete(fullMessages)
   return { content, search: searchInfo }
 }

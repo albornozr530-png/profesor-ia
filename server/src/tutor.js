@@ -2,7 +2,7 @@
 import express from 'express'
 import { LEVELS } from './levels.js'
 import { webSearch } from './search.js'
-import { callPollinations } from './ai.js'
+import { callPollinationsComplete, streamPollinationsComplete } from './ai.js'
 
 const router = express.Router()
 
@@ -84,15 +84,83 @@ router.post('/tutor/chat', async (req, res) => {
       ? `\n\nRESULTADOS DE BÚSQUEDA WEB (úsalos si son relevantes, cita la fuente al final):\n${sources.map((s) => `- ${s.title}: ${s.snippet || 'sin resumen'} (${s.uri})`).join('\n')}`
       : ''
 
-    const system = baseSystem(profile, 'Estás en una conversación de tutoría por chat.' + searchBlock)
-    const content = await callPollinations(
-      [{ role: 'system', content: system }, ...messages.slice(-16).map((m) => ({ role: m.role, content: m.content }))],
+    const system = baseSystem(profile, 'Estás en una conversación de tutoría por chat.\nPROFUNDIDAD: desarrolla cada tema por completo — definiciones, fundamentos, ejemplos resueltos paso a paso, errores comunes y síntesis. Nunca des respuestas superficiales ni cortes por brevedad.' + searchBlock)
+    const content = await callPollinationsComplete(
+      [{ role: 'system', content: system }, ...messages.slice(-40).map((m) => ({ role: m.role, content: m.content }))],
       {}
     )
     res.json({ text: content, sources })
   } catch (err) {
     console.error('[tutor/chat]', err.message)
     res.status(502).json({ error: 'Error del motor de IA. Intenta de nuevo en unos segundos.' })
+  }
+})
+
+// ---------- 1b) Chat con escritura en vivo (streaming SSE) ----------
+// El profesor "escribe" la respuesta en tiempo real: el servidor retransmite
+// cada fragmento del proveedor como evento SSE y al final envía las fuentes.
+router.post('/tutor/chat/stream', async (req, res) => {
+  try {
+    const { messages = [], profile = {}, useSearch = false } = req.body
+    const lastUser = [...messages].reverse().find((m) => m.role === 'user')
+
+    let sources = []
+    if (useSearch && lastUser) {
+      const found = await webSearch(lastUser.content.slice(0, 200))
+      if (found) {
+        sources = found.results.slice(0, 4).map((r) => ({ title: r.title, uri: r.url, snippet: r.snippet || '' }))
+      }
+    }
+    const searchBlock = sources.length
+      ? `\n\nRESULTADOS DE BÚSQUEDA WEB (úsalos si son relevantes, cita la fuente al final):\n${sources.map((s) => `- ${s.title}: ${s.snippet || 'sin resumen'} (${s.uri})`).join('\n')}`
+      : ''
+
+    const system = baseSystem(profile, 'Estás en una conversación de tutoría por chat.\nPROFUNDIDAD: desarrolla cada tema por completo — definiciones, fundamentos, ejemplos resueltos paso a paso, errores comunes y síntesis. Nunca des respuestas superficiales ni cortes por brevedad.' + searchBlock)
+    const fullMessages = [
+      { role: 'system', content: system },
+      ...messages.slice(-40).map((m) => ({ role: m.role, content: m.content })),
+    ]
+
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache, no-transform',
+      'Connection': 'keep-alive',
+      'X-Accel-Buffering': 'no',
+    })
+
+    const send = (event, data) => {
+      res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
+    }
+
+    send('sources', { sources })
+
+    let received = false
+    try {
+      await streamPollinationsComplete(fullMessages, {
+        onChunk: (piece) => {
+          received = true
+          send('delta', { text: piece })
+        },
+      })
+      send('done', {})
+    } catch (streamErr) {
+      console.error('[tutor/chat/stream]', streamErr.message)
+      if (!received) {
+        // El stream aún no empezó: se puede caer a una respuesta JSON de error.
+        send('error', { error: 'Error del motor de IA. Intenta de nuevo en unos segundos.' })
+      } else {
+        send('error', { error: 'La conexión con el motor de IA se interrumpió a mitad de la respuesta.' })
+      }
+    }
+    res.end()
+  } catch (err) {
+    // Si los headers aún no se enviaron (p. ej. falló la búsqueda web), error normal.
+    if (!res.headersSent) {
+      console.error('[tutor/chat/stream]', err.message)
+      res.status(502).json({ error: 'Error del motor de IA. Intenta de nuevo en unos segundos.' })
+    } else {
+      res.end()
+    }
   }
 })
 

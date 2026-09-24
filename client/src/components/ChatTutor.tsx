@@ -18,7 +18,8 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { StudentProfile, ChatMessage } from '../types';
-import { sendChatMessage } from '../utils/api';
+import { sendChatMessage, streamChatMessage } from '../utils/api';
+import { MarkdownText } from './MarkdownText';
 import { getStoredChat, saveStoredChat } from '../utils/storage';
 import { isDictationAvailable, startDictation, DictationController } from '../utils/speech';
 import { SAMPLE_PROMPTS_BY_LEVEL, ACADEMIC_LEVELS } from '../utils/academicPresets';
@@ -35,6 +36,9 @@ export const ChatTutor: React.FC<ChatTutorProps> = ({ profile, onSendToReview })
   const [useSearch, setUseSearch] = useState<boolean>(false);
   const [isSpeaking, setIsSpeaking] = useState<boolean>(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  // Texto que el profesor está "escribiendo" en vivo en este momento.
+  const [streamingText, setStreamingText] = useState<string>('');
+  const streamingTextRef = useRef<string>('');
 
   // Dictado universal: Web Speech en navegador/Electron y plugin nativo en Android.
   const [isListening, setIsListening] = useState<boolean>(false);
@@ -176,13 +180,32 @@ export const ChatTutor: React.FC<ChatTutorProps> = ({ profile, onSendToReview })
     setMessages(updatedMessages);
     setInputText('');
     setIsLoading(true);
+    streamingTextRef.current = '';
+    setStreamingText('');
 
     try {
-      const response = await sendChatMessage(
-        updatedMessages.map((m) => ({ role: m.role, content: m.content })),
-        profile,
-        useSearch
-      );
+      // Escritura en vivo: el profesor redacta la respuesta fragmento a
+      // fragmento. Si el stream falla antes de empezar, cae al método clásico.
+      let response: { text: string; sources?: ChatMessage['sources'] };
+      try {
+        response = await streamChatMessage(
+          updatedMessages.map((m) => ({ role: m.role, content: m.content })),
+          profile,
+          useSearch,
+          (chunk) => {
+            streamingTextRef.current += chunk;
+            setStreamingText(streamingTextRef.current);
+          }
+        );
+      } catch (streamError: any) {
+        if (streamingTextRef.current) throw streamError;
+        console.warn('Stream no disponible, usando respuesta completa:', streamError?.message);
+        response = await sendChatMessage(
+          updatedMessages.map((m) => ({ role: m.role, content: m.content })),
+          profile,
+          useSearch
+        );
+      }
 
       if (requestId !== requestIdRef.current) return;
 
@@ -208,7 +231,11 @@ export const ChatTutor: React.FC<ChatTutorProps> = ({ profile, onSendToReview })
       };
       setMessages((prev) => [...prev, errorMessage]);
     } finally {
-      if (requestId === requestIdRef.current) setIsLoading(false);
+      if (requestId === requestIdRef.current) {
+        setIsLoading(false);
+        streamingTextRef.current = '';
+        setStreamingText('');
+      }
     }
   };
 
@@ -393,9 +420,9 @@ export const ChatTutor: React.FC<ChatTutorProps> = ({ profile, onSendToReview })
                   </span>
                 </div>
 
-                {/* Formatted Text Content */}
-                <div className="whitespace-pre-wrap font-sans text-sm sm:text-[14.5px] leading-relaxed">
-                  {msg.content}
+                {/* Formatted Text Content (Markdown renderizado) */}
+                <div className="font-sans text-sm sm:text-[14.5px] leading-relaxed break-words">
+                  <MarkdownText content={msg.content} />
                 </div>
 
                 {/* Grounding Sources (if Google Search was used) */}
@@ -477,8 +504,8 @@ export const ChatTutor: React.FC<ChatTutorProps> = ({ profile, onSendToReview })
           );
         })}
 
-        {/* Loading Spinner Indicator */}
-        {isLoading && (
+{/* Loading Spinner Indicator */}
+        {isLoading && !streamingText && (
           <div className="flex gap-3 justify-start items-center">
             <div className="w-9 h-9 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow animate-pulse">
               👨‍🏫
@@ -488,6 +515,25 @@ export const ChatTutor: React.FC<ChatTutorProps> = ({ profile, onSendToReview })
               <span>
                 El profesor está pensando y razonando la mejor explicación para tu nivel...
               </span>
+            </div>
+          </div>
+        )}
+
+        {/* Escritura en vivo: el profesor redacta la respuesta en tiempo real */}
+        {isLoading && streamingText && (
+          <div className="flex gap-3 justify-start">
+            <div className="w-9 h-9 rounded-2xl bg-gradient-to-tr from-indigo-600 to-blue-500 text-white flex items-center justify-center shrink-0 shadow text-sm font-bold mt-1">
+            🧑‍🏫
+            </div>
+            <div className="max-w-[88%] sm:max-w-[80%] rounded-2xl p-4 shadow-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-100 rounded-bl-none">
+              <div className="flex items-center justify-between gap-3 mb-1 text-[11px] opacity-75">
+                <span className="font-semibold">Profesor IA</span>
+                <span className="text-indigo-500 font-bold animate-pulse">escribiendo...</span>
+              </div>
+              <div className="font-sans text-sm sm:text-[14.5px] leading-relaxed break-words">
+                <MarkdownText content={streamingText} />
+                <span className="inline-block w-2 h-4 align-text-bottom bg-indigo-500 animate-pulse ml-0.5 rounded-sm" />
+              </div>
             </div>
           </div>
         )}

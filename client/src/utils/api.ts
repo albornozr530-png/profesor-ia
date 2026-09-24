@@ -49,6 +49,78 @@ export async function sendChatMessage(
   });
 }
 
+/**
+ * Chat con escritura en vivo: el profesor "escribe" la respuesta en tiempo
+ * real vía SSE. onDelta se llama con cada fragmento de texto; devuelve el
+ * texto completo y las fuentes consultadas.
+ */
+export async function streamChatMessage(
+  messages: Array<{ role: 'user' | 'assistant'; content: string }>,
+  profile: StudentProfile,
+  useSearch: boolean = false,
+  onDelta?: (chunk: string) => void,
+  onSources?: (sources: Array<{ title: string; uri: string; snippet?: string }>) => void
+): Promise<ChatResponse> {
+  const response = await fetch(apiUrl('/api/tutor/chat/stream'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ messages, profile, useSearch }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || `Error del servidor (${response.status})`);
+  }
+  if (!response.body) throw new Error('El servidor no devolvió stream');
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let full = '';
+  let sources: ChatResponse['sources'] = [];
+  let streamError: string | null = null;
+
+  const processEvent = (event: string, data: string) => {
+    let parsed: any;
+    try {
+      parsed = JSON.parse(data);
+    } catch {
+      return;
+    }
+    if (event === 'sources') {
+      sources = parsed.sources || [];
+      onSources?.(sources);
+    } else if (event === 'delta') {
+      full += parsed.text || '';
+      onDelta?.(parsed.text || '');
+    } else if (event === 'error') {
+      streamError = parsed.error || 'Error del motor de IA';
+    }
+  };
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    // Los eventos SSE terminan con doble salto de línea.
+    const events = buffer.split('\n\n');
+    buffer = events.pop() || '';
+    for (const rawEvent of events) {
+      let event = 'message';
+      let dataLines: string[] = [];
+      for (const line of rawEvent.split('\n')) {
+        if (line.startsWith('event:')) event = line.slice(6).trim();
+        else if (line.startsWith('data:')) dataLines.push(line.slice(5).trim());
+      }
+      if (dataLines.length) processEvent(event, dataLines.join('\n'));
+    }
+  }
+
+  if (streamError && !full) throw new Error(streamError);
+  if (!full && !streamError) throw new Error('La respuesta del profesor llegó vacía. Intenta de nuevo.');
+  return { text: full, sources };
+}
+
 export async function requestExerciseReview(
   exerciseStatement: string,
   studentWork: string,

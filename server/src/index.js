@@ -32,7 +32,11 @@ const defaultOrigins = [
   'https://localhost',
   'capacitor://localhost',
 ]
-const allowedOrigins = new Set([...defaultOrigins, ...configuredOrigins])
+const renderOrigin = process.env.RENDER_EXTERNAL_URL || (process.env.RENDER_EXTERNAL_HOSTNAME
+  ? `https://${process.env.RENDER_EXTERNAL_HOSTNAME}`
+  : '')
+const runtimeOrigins = renderOrigin ? [renderOrigin.replace(/\/$/, '')] : []
+const allowedOrigins = new Set([...defaultOrigins, ...configuredOrigins, ...runtimeOrigins])
 
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff')
